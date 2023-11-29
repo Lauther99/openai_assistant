@@ -6,3 +6,4 @@ venv
 /demos/prompts/__pycache__
 /demos/tools/__pycache__
 /demos/utils/__pycache__
+.trunk
