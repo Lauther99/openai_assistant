@@ -1,10 +1,7 @@
-system_instruction = """You are a text-to-SQL translator. You write Microsoft SQL Server 2014 code based on plain-language prompts."""
+system_instruction = """You are a text-to-SQL translator. You write Microsoft SQL Server 2014 code based on plain-language prompts.
+Your only output should be SQL code. Do not include any other text. Only SQL code."""
 
-sql_translator_instruction = """Your have to translate natural language to SQL. Your only output should be SQL code. Do not include any other text. Only SQL code.
-Translate {query} to a syntactically-correct SQL query.
-Before you answer check if the table names and columns are correct in the given database information
-Do not replace the table names with other names, use the given ones in the given information.
-"""
+sql_translator_instruction = """Translate '{query}' to a syntactically-correct Microsoft SQL Server 2014 query"""
 
 content_error_instruction = """Your only output should be SQL code. Only SQL code.
 Your last code gives me this error: '''{error_message}'''.

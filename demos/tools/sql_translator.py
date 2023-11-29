@@ -19,29 +19,20 @@ from langchain.pydantic_v1 import BaseModel, Field
 def get_sql_query(search_tables, query_input) -> str:
     openai.api_key = OPENAI_API_KEY
 
-    description = ""
-    for name in search_tables:
-        description += get_description(name, tables)
+    description = get_description("dbo_v2", search_tables)
 
-    user_prompt = """
-    Language Microsoft SQL Server 2014
-    You will have information about the database involved in triple single quotes with this format: Table, Columns, Description.
-    Read the table descriptions and the columns carefully to understand and then translate.
-    '''
-    {description}
-    '''
-    {sql_translator}
-    """
+    user_prompt = """Using the schema dbo_v2 and this database information:\n'''\n{description}\n'''\n{sql_translator}"""
 
     user_prompt = user_prompt.format(
         sql_translator=sql_translator_instruction.format(query=query_input),
         description=description,
     )
+    
     messages = [
         {"role": "system", "content": system_instruction},
         {"role": "user", "content": user_prompt},
     ]
-
+    
     client = openai.OpenAI()
 
     completion = client.chat.completions.create(
@@ -60,7 +51,7 @@ def get_sql_query(search_tables, query_input) -> str:
     return completion.choices[0].message.content.replace('"', "") or ""
 
 
-def sql_error(error_message) -> str:
+def sql_error_fixer(error_message) -> str:
     openai.api_key = OPENAI_API_KEY
 
     user = find_user("51989915557")
@@ -111,6 +102,15 @@ class SQLTranslatorTool(BaseSQLDatabaseTool, BaseTool):
     def _arun(self, query_input: str):
         raise NotImplementedError("This tool does not support async")
 
+class SQLQueryFixer(BaseTool):
+    name = "sql_query_fixer"
+    description = "this tool allows you to correct and rewrite the query. Input to this tool is an error from database failed query, only the output to this tool is a SQL code"
+
+    def _run(self, query_error: str):
+        return sql_error_fixer(query_error)
+
+    def _arun(self, query_error: str):
+        raise NotImplementedError("This tool does not support async")
 
 search_tables = [
     "fcs_computadores",
@@ -120,12 +120,12 @@ search_tables = [
     "var_variable_datos",
 ]
 
-query = "Values of the 'Pressão Estática (kPa)' registered in october 17th in 2022 for all measurements systems for the computer with tag FQI-EMED_05-08-10"
+# query = "Values of the 'Pressão Estática (kPa)' registered in october 17th in 2022 for all measurements systems for the computer with tag FQI-EMED_05-08-10"
 
-get_sql_query(search_tables, query)
+# get_sql_query(search_tables, query)
 # print(
-#     sql_error(
-#         """Msg 207, Level 16, State 1, Line 4
+#     sql_error_fixer(
+#         """Msg 207, Level 16, State 1, Line 5
 # Invalid column name 'IdComputador_fk'.
 # """
 #     )

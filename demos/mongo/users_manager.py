@@ -20,7 +20,7 @@ def save_to_chat(new_chat_list, user_phone):
     else:
         print("Error al buscar/crear usuario")
 
-    mongo_client.close()
+    # mongo_client.close()
         
 def find_user(user_phone):
     usuario = collection.find_one({"user_phone": user_phone})
