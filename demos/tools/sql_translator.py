@@ -1,48 +1,87 @@
 import sys
+
 sys.path.append("C:\\Users\\lauth\\OneDrive\\Desktop\\openai_assistant")
 
 import openai
-from demos.prompts.instructions import sql_translator_instruction, system_instruction
+from demos.prompts.instructions import (
+    sql_translator_instruction,
+    system_instruction,
+    content_error_instruction,
+)
+from demos.mongo.users_manager import save_to_chat, find_user
 from demos.data.data_info import tables
 from demos.config.env_config import OPENAI_API_KEY
 from demos.utils.getDescription import get_description
 from langchain.tools import BaseTool
 from langchain.pydantic_v1 import BaseModel, Field
 
+
 def get_sql_query(search_tables, query_input) -> str:
     openai.api_key = OPENAI_API_KEY
-    
-    description = ""
-    for name in search_tables:
-        description += get_description(name, tables)
 
-    user_prompt = """
-    - Language Microsoft SQL Server 2014
-    - You will have information below in text between triple single quotes with this format: Table, Columns, Description.
-    Do not replace the table names with other names, use the given ones and then translate.
-    '''
-    {description}
-    '''
-    {sql_translator}
-    """
+    description = get_description("dbo_v2", search_tables)
+
+    user_prompt = """Using the schema dbo_v2 and this database information:\n'''\n{description}\n'''\n{sql_translator}"""
 
     user_prompt = user_prompt.format(
         sql_translator=sql_translator_instruction.format(query=query_input),
         description=description,
     )
-    query = [
+    
+    messages = [
         {"role": "system", "content": system_instruction},
         {"role": "user", "content": user_prompt},
     ]
+    
+    client = openai.OpenAI()
+
+    completion = client.chat.completions.create(
+        model="gpt-3.5-turbo", messages=messages
+    )
+
+    messages.append(
+        {
+            "role": "assistant",
+            "content": completion.choices[0].message.content.replace('"', "") or "",
+        }
+    )
+
+    # Agregando a la db
+    save_to_chat(messages, "51989915557")
+    return completion.choices[0].message.content.replace('"', "") or ""
+
+
+def sql_error_fixer(error_message) -> str:
+    openai.api_key = OPENAI_API_KEY
+
+    user = find_user("51989915557")
+    messages = user["chats"] or []
+
+    messages.append(
+        {
+            "role": "user",
+            "content": content_error_instruction.format(error_message=error_message),
+        }
+    )
 
     client = openai.OpenAI()
 
     completion = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=query
+        model="gpt-3.5-turbo", messages=messages
     )
 
-    return completion.choices[0].message.content or ''
+    messages.append(
+        {
+            "role": "assistant",
+            "content": completion.choices[0].message.content.replace('"', "") or "",
+        }
+    )
+
+    # Agregando a la db
+    save_to_chat(messages, "51989915557")
+
+    return completion.choices[0].message.content.replace('"', "") or ""
+
 
 class BaseSQLDatabaseTool(BaseModel):
     """Base tool for interacting with a SQL database."""
@@ -51,6 +90,7 @@ class BaseSQLDatabaseTool(BaseModel):
 
     class Config(BaseTool.Config):
         pass
+
 
 class SQLTranslatorTool(BaseSQLDatabaseTool, BaseTool):
     name = "sql_translator"
@@ -61,6 +101,17 @@ class SQLTranslatorTool(BaseSQLDatabaseTool, BaseTool):
 
     def _arun(self, query_input: str):
         raise NotImplementedError("This tool does not support async")
+
+class SQLQueryFixer(BaseTool):
+    name = "sql_query_fixer"
+    description = "this tool allows you to correct and rewrite the query. Input to this tool is an error from database failed query, only the output to this tool is a SQL code"
+
+    def _run(self, query_error: str):
+        return sql_error_fixer(query_error)
+
+    def _arun(self, query_error: str):
+        raise NotImplementedError("This tool does not support async")
+
 search_tables = [
     "fcs_computadores",
     "fcs_computador_medidor",
@@ -68,5 +119,14 @@ search_tables = [
     "var_tipo_variable",
     "var_variable_datos",
 ]
-query = "Values of the 'Pressão Estática (kPa)' registered in october 17th in 2022 for all measurements systems for the computer with tag FQI-EMED_05-08-10"
-get_sql_query(search_tables, query)
+
+# query = "Values of the 'Pressão Estática (kPa)' registered in october 17th in 2022 for all measurements systems for the computer with tag FQI-EMED_05-08-10"
+
+# get_sql_query(search_tables, query)
+# print(
+#     sql_error_fixer(
+#         """Msg 207, Level 16, State 1, Line 5
+# Invalid column name 'IdComputador_fk'.
+# """
+#     )
+# )

@@ -21,6 +21,7 @@
 PREFIX = """You do not know anything about translating SQL, to answer the user question you have to follow this steps:
 First, use the "sql_translator" tool to translate text into sql code using,
 Second, find the result in the database with "sql_db_query" tool
+If you have errors, use the "sql_query_fixer" tool to fix the problem
 """
 FORMAT_INSTRUCTIONS = """Use the following format:
 
